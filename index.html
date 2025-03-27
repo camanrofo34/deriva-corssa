@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DerivaRacer Lite</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1>DerivaRacer Lite</h1>
+        <div class="level-info">
+            <p>Nivel: <span id="level">1</span></p>
+            <p>Objetivo: <span id="objective">Mantén la velocidad entre 100 y 200 px/s</span></p>
+        </div>
+        <div class="map">
+            <div id="car" class="car"></div>
+        </div>
+        <div class="indicators">
+            <div class="indicator">
+                <span>Posición X</span>
+                <span id="positionX">0</span> px
+            </div>
+            <div class="indicator">
+                <span>Posición Y</span>
+                <span id="positionY">0</span> px
+            </div>
+            <div class="indicator">
+                <span>Velocidad</span>
+                <span id="velocity">0</span> px/s
+            </div>
+            <div class="indicator">
+                <span>Aceleración</span>
+                <span id="acceleration">0</span> px/s²
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
