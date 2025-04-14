@@ -1,238 +1,450 @@
-// Variables del juego
-let positionX = 50; // Posición inicial del auto en X (punto de partida)
-let positionY = 300; // Posición inicial del auto en Y (punto de partida)
-let velocityX = 0; // Velocidad en X
-let velocityY = 0; // Velocidad en Y
-let accelerationX = 0; // Aceleración en X
-let accelerationY = 0; // Aceleración en Y
-const maxSpeed = 300; // Velocidad máxima (px/s)
-const accelerationRate = 150; // Tasa de aceleración (px/s²)
-const brakingRate = 300; // Tasa de frenado (px/s²)
-const friction = 0.95; // Fricción reducida para un frenado más suave
-let lastTime = Date.now(); // Tiempo inicial
-let hasReachedObjective = false; // Indica si el jugador ha alcanzado el rango objetivo
-let outOfRangeTime = 0; // Tiempo que el jugador ha estado fuera del rango objetivo
-const outOfRangeThreshold = 1; // Tiempo máximo permitido fuera del rango (en segundos)
+// Variables para cálculo de velocidad y aceleración
+let lastPosition = 0;
+let lastVelocity = 0;
+let lastTime = performance.now();
 
-// Punto de partida y punto de llegada
-const startPoint = { x: 50, y: 300 }; // Punto de partida
-const endPoint = { x: 700, y: 300 }; // Punto de llegada
-const endRadius = 50; // Radio de llegada (px)
+// Actualizar velocidad y aceleración
+// Variables acumuladoras para delta más amplia
+let accumulatedPosition = 0;
+let accumulatedTime = 0;
 
-// Variables para el cálculo de derivadas
-let lastPositionX = positionX; // Posición anterior en X
-let lastPositionY = positionY; // Posición anterior en Y
-let lastVelocityX = 0; // Velocidad anterior en X
-let lastVelocityY = 0; // Velocidad anterior en Y
+function updateVelocityAndAcceleration() {
+    const currentTime = performance.now();
+    const deltaTime = Math.max((currentTime - lastTime) / 1000, 0.016); // Mínimo de 16 ms (60 FPS)
 
-// Variables del nivel
-let currentLevel = 1;
-const levelObjectives = [
-    { velocityMin: 100, velocityMax: 200 }, // Nivel 1: Mantener la velocidad entre 100 y 200 px/s
-    { accelerationMin: -50, accelerationMax: 50 }, // Nivel 2: Mantener la aceleración entre -50 y 50 px/s²
-    // Añadir más niveles aquí
+    // Evitar divisiones por cero o tiempos muy pequeños
+    if (deltaTime <= 0) return;
+
+    const currentPosition = car.km * 1000; // Convertir km a metros
+
+    // Acumular cambios de posición y tiempo
+    accumulatedPosition += currentPosition - lastPosition;
+    accumulatedTime += deltaTime;
+
+    // Calcular velocidad y aceleración solo si el tiempo acumulado supera un umbral
+    if (accumulatedTime >= 0.2) { // Usar un intervalo de 200 ms
+        const velocity = accumulatedPosition / accumulatedTime; // v = Δx / Δt
+        const acceleration = (velocity - lastVelocity) / accumulatedTime; // a = Δv / Δt
+
+        // Actualizar valores en pantalla
+        document.getElementById('velocity').innerText = `Velocidad: ${velocity.toFixed(2)} m/s`;
+        document.getElementById('acceleration').innerText = `Aceleración: ${acceleration.toFixed(2)} m/s²`;
+
+        // Actualizar variables para el próximo cálculo
+        lastVelocity = velocity;
+        accumulatedPosition = 0; // Reiniciar acumuladores
+        accumulatedTime = 0;
+    }
+
+    // Actualizar variables de posición y tiempo
+    lastPosition = currentPosition;
+    lastTime = currentTime;
+}
+
+//CARS
+var car = document.getElementById('car');
+car.init = function () { 
+    car.speed = 0.2; // Velocidad inicial
+    car.turn = 0;
+    car.x = car.offsetLeft;
+    car.y = 0;
+    car.width = car.offsetWidth;
+    car.height = car.offsetHeight;
+    car.maxSpeed = 80; // Velocidad máxima en m/s (108 km/h)
+    car.km = 0;
+    car.motor = 1;  
+    car.crashed = false;
+    car.acc = 0.1; // Aceleración más realista (0.1 m/s²)
+    car.break = 0.05; // Frenado más realista (0.05 m/s²)
+};
+car.frame = function () {
+  car.motor *= -1;
+  car.style.left = parseInt(car.x) + 'px';
+  car.style.transform = 'scaleX('+car.motor+')';
+  car.steer();
+};
+car.steer = function () {
+  car.x += car.sx;
+  road.P0.x -= car.sx/4;
+};
+car.crash = function (d) {
+  if (!car.crashed) {
+    car.crashed = true;
+    car.speed = 0.2;
+    car.sx = d ? d : 0;
+    game.audio.oscillator.frequency.value = 15;
+    setTimeout(function () {
+      game.audio.oscillator.frequency.value = 60;
+      car.crashed = false;
+      car.sx = 0;
+    }, 800);
+  }
+}
+var cars = document.getElementById('cars');
+cars.init = function () {
+  cars.n = 32;
+  cars.x = 0;
+  cars.speed = 1;  
+  cars.interval = 500;
+  cars.oponents = [];
+  cars.easy = 0.2;
+  for (var j=0; j<cars.n; j++) {
+    cars.oponents[j] = [];
+    for (var i=0; i<3; i++) {
+      cars.oponents[j][i] = cars.create(i,j); 
+    }
+  }
+  car.st = document.createElement('style');
+  document.body.appendChild(car.st);
+  cars.builded = true;
+};
+cars.frame = function () {
+  var relative = cars.speed - car.speed;
+  for (var j=0; j<cars.n; j++) {
+    for (var i=0; i<3; i++) { 
+      var c = cars.oponents[j][i];   
+      var d = road.width * 0.42, 
+        w = road.width - d - car.width; 
+      c.x = (road.P0.x - road.height - 40) * (c.y * c.y * 0.00001) + 
+            (d/2) + (i * (w/2)); 
+      c.y += relative;
+      var h = cars.n * car.height * 3;
+      if (!c.classList.contains('hidden') && 
+          c.y < car.height - 5 && c.y > 0) {
+        //collision
+        if (car.x < 115 && i == 0) car.crash(0.1);
+        if (car.x > 100 && car.x < 175 && i == 1) car.crash();
+        if (car.x > 165 && i == 2) car.crash(-0.1);
+      }
+      if (c.y > h) {
+        // back to bottom
+        cars.color(c);  
+        c.classList.remove('hidden');
+        if (car.x < 115 && i == 0) c.classList.add('hidden');
+        if (car.x > 100 && car.x < 175 && i == 1) c.classList.add('hidden');
+        if (car.x > 165 && i == 2) c.classList.add('hidden');
+        if (Math.random() > cars.easy) c.classList.add('hidden');
+        if (!c.classList.contains('hidden')) car.position++;
+        c.y = 0;
+      } else if (c.y < 0)  {
+        //passing
+        if (!c.classList.contains('hidden')) {
+          car.position--;
+        } 
+        cars.color(c);
+        c.classList.remove('hidden');
+        if (Math.random() > cars.easy) c.classList.add('hidden');
+        c.y = h;
+        cars.color(c);
+      }
+      c.style.left = parseInt(c.x) + 'px';
+      c.style.bottom = parseInt(c.y) + 'px';
+      var o = 1 / (c.y * fog.value);
+      c.style.opacity = Math.min(o, 1);
+    }
+    if (!cars.oponents[j][0].classList.contains('hidden') &&
+        !cars.oponents[j][1].classList.contains('hidden') &&
+        !cars.oponents[j][2].classList.contains('hidden')) {
+      cars.oponents[j][parseInt(Math.random() * 3)].classList.add('hidden');
+    }
+  }
+  car.st.innerHTML = '#cars .car {transform: rotateX(-56deg) scaleX('+car.motor+') }';
+  car.style.left = parseInt(car.x) + 'px';
+};
+cars.create = function (i,j) {  
+  var c = document.createElement('div');
+  c.className = 'car';
+  cars.color(c);
+  var d = road.width * 0.42, 
+      w = road.width - d - car.width; 
+  c.x = (d/2) + (i * (w/2)); 
+  c.y = -car.height + (j * car.height*3); 
+  cars.appendChild(c);   
+  if (Math.random() > 0.1) c.classList.add('hidden');
+  if (i == 1 && j == 0 || i == 1 && j == 1) c.classList.add('hidden');
+  return c;
+};
+cars.color = function (c) {
+  var randomColor = Math.random()*360;
+  var randomLight = 2.5 + (Math.random() * 2);
+  c.style['filter'] = 'hue-rotate('+randomColor+'deg) brightness('+randomLight+')';
+};
+//ROAD
+var road = document.getElementById('road');
+road.init = function() {
+  road.ctx = road.getContext('2d');
+  road.width = road.offsetWidth; 
+  road.height = road.offsetHeight;
+  road.state = 0;
+  road.x = 0;
+  road.offset = 40;
+  road.lineWidth = 2.5;
+  road.lineColor = 'rgba(255,255,255,0.7)';
+  road.lineDashOffset = 0;
+  road.P0 =  {x: parseInt(road.width/2), y: 0, xs: 0};
+  road.P1 =  {x: road.offset, y: road.height};
+  road.P2 =  {x: road.width - road.offset, y: road.height};
+  road.Pc =  {x1: road.P1.x + 86, x2: road.P2.x - 86};
+  road.frame();
+};
+road.frame = function () {
+  road.P0.x  += road.P0.xs/2;
+  road.Pc.x1 -= road.P0.xs/3;
+  road.Pc.x2 -= road.P0.xs/3; 
+  road.lineDashOffset -= car.speed;
+  
+  road.ctx.clearRect(0, 0, road.width, road.height);
+  road.ctx.beginPath();
+
+  road.ctx.moveTo(       road.P1.x,  road.P1.y);
+  road.ctx.bezierCurveTo(road.Pc.x1, road.P1.y - (road.height*0.7),
+                         road.P0.x,  road.P0.y,
+                         road.P0.x,  road.P0.y);
+
+  road.ctx.moveTo(       road.P2.x,  road.P2.y);
+  road.ctx.bezierCurveTo(road.Pc.x2, road.P2.y - (road.height*0.7),
+                         road.P0.x,  road.P0.y,
+                         road.P0.x,  road.P0.y);
+
+  road.ctx.strokeStyle = road.lineColor;
+  road.ctx.lineWidth = road.lineWidth;
+  road.ctx.setLineDash([road.lineWidth, road.lineWidth]);
+  road.ctx.lineDashOffset = road.lineDashOffset * -0.5;
+  road.ctx.stroke();
+};
+road.curve = function (side) {
+  if (!(road.state == -1 && side == 'left') &&
+      !(road.state == 1 && side == 'right')) {
+    if (road.state == 1 && side == 'left') road.state = 0;
+    else if (road.state == -1 && side == 'right') road.state = 0;  
+    else if (road.state == 0 && side == 'left') road.state = -1;
+    else if (road.state == 0 && side == 'right') road.state = 1;
+    road.P0.xs = 1.5 * ((side == 'left') ? -1 : 1);
+  }
+  road.randomCurve();
+  setTimeout(function () {
+    road.P0.xs = 0;
+  }, 1000);
+};
+road.randomCurve = function () {
+  game.curveCount = setTimeout(function () {
+    road.curve(Math.random()>0.5 ? 'left' : 'right');
+  }, 2000); 
+};
+//MOUNTAINS
+var mountains = document.getElementById('mountains');
+mountains.frame = function () {
+  var curve = (road.P0.x - road.width/2)/100; 
+  var left = mountains.offsetLeft;
+  if (left < -4.5 * road.width) left =  1.5 * road.width;
+  if (left >  1.5 * road.width) left = -4.5 * road.width;
+  var d = curve + ((car.speed)*curve*0.5);
+  mountains.style.left = parseInt(left - d) + 'px';
+};
+//UI
+var km = document.getElementById('km');
+km.frame = function () {
+    car.km += (car.speed / 1000); // Incrementar posición en kilómetros
+    var value = parseInt(car.km * 10).toString(); // Convertir a un valor legible
+    while (value.length < km.childNodes.length) value = '0' + value;
+    for (var i = 1; i < km.childNodes.length; i++) {
+        var a = km.childNodes[i];
+        a.innerText = value[i - 1];
+    }
+};
+var position = document.getElementById('position');
+position.init = function () {
+  cars.total = 200;
+  car.position = cars.total;
+}
+position.frame = function () {   
+  var value = parseInt(car.position).toString();
+  for (var i=0; i < position.childNodes.length-1; i++) {
+    var a = position.childNodes[i+1];
+    a.innerText = value[i];
+  }
+}
+//LAP 
+var lap = document.getElementById('lap');
+lap.init = function () {
+  lap.value = 1;
+}
+lap.frame = function () {  
+  if (car.position <= 0) {
+    lap.value++;
+    car.easy += 0.5;
+    car.position = 200;
+  }
+  if (lap.value > 9) alert("GAME OVER\n YOU WIN!!!");
+  lap.innerText = lap.value;
+}
+//FRAME
+var frame = function () {
+    if (!frame.stop) {
+      key.frame();
+      car.frame();
+      cars.frame();
+      mountains.frame();
+      road.frame();
+      km.frame();
+      position.frame();
+      updateVelocityAndAcceleration(); // Llamar a la función en cada frame
+      requestAnimationFrame(frame);
+    }
+  };
+//KEYBOARD
+var key = {
+  pressed: [],
+  frame: function () { 
+    if (!car.crashed) {
+        car.sx = 0;
+        if (car.x > road.width * 0.15) {
+            if (key.pressed['left'] ||
+                key.pressed[37] || // Key: Left arrow
+                key.pressed[65]) { // Key: 'A'
+                car.sx = -1.5; // Reducir velocidad lateral
+            }
+        } else car.crash(0.2);
+        if (car.x < (road.width * 0.85) - car.width) {
+            if (key.pressed['right'] ||
+                key.pressed[39] || // Key: Right arrow
+                key.pressed[68]) { // Key: 'D'
+                car.sx = 1.5; // Reducir velocidad lateral
+            }
+        } else car.crash(-0.2);
+        if (key.pressed['up'] ||
+            key.pressed[32] || // Key: Space
+            key.pressed[38] || // Key: Up arrow
+            key.pressed[87]) { // Key: 'W'
+            if (car.speed < car.maxSpeed) { 
+                car.speed += car.acc; // Incremento más suave
+                game.audio.oscillator.frequency.value += car.acc * 10;
+            }
+        } else {
+            if (car.speed > 0.2) {
+                car.speed -= car.break; // Frenado más suave
+                game.audio.oscillator.frequency.value -= car.break * 10;
+            }
+        }
+    }
+}
+};
+window.addEventListener('keydown', function (event) { 
+  key.pressed[event.keyCode] = true;
+});
+window.addEventListener('keyup', function (event) {
+  key.pressed[event.keyCode] = false;
+});
+//GAME
+var game = document.getElementById('game');
+game.init = function () {
+  game.time = 0;
+  car.init();
+  cars.init();
+  road.init();
+  position.init();
+  lap.init();
+  fog.init();
+  cars.frame();
+};
+// BUTTONS
+var buttons = ['left', 'up', 'right'];
+buttons.forEach(function (id) {
+  var button = document.getElementById(id);
+  var press = function (event) { 
+    key.pressed[id] = true;
+  };
+  var release = function (event) {
+    key.pressed[id] = false;
+  };
+  button.addEventListener('mousedown', press);
+  button.addEventListener('mouseup', release);
+  button.addEventListener('touchstart', press);
+  button.addEventListener('touchend', release);
+});
+var clickstart = document.getElementById('click')
+clickstart.addEventListener('click', function () {
+  if (!game.started) {
+    clickstart.innerText = 'Click to Pause';
+    game.time = 0;
+    game.started = true;
+    frame.stop = false;
+    if (!cars.builded) cars.init();
+    game.audio();
+    game.curveCount = setTimeout(road.randomCurve, 5000);
+    game.timeCount = setTimeout(game.changeTime, 30000);
+    frame();
+  } else {
+    clickstart.innerText = 'Click to Start!';
+    game.started = false;
+    frame.stop = true;
+    clearTimeout(game.curveCount);
+    clearTimeout(game.timeCount);
+    game.audio.oscillator.stop();
+  }
+});
+//AUDIO
+game.audio = function () {
+  if (game.audio.oscillator) {
+    game.audio.oscillator.stop(game.audio.context.currentTime);
+    game.audio.oscillator.disconnect(game.audio.volume);
+    delete game.audio.oscillator;
+  }
+  game.audio.context = new AudioContext();
+  game.audio.volume = game.audio.context.createGain();
+  game.audio.volume.gain.value = 0.1;
+  game.audio.volume.connect(game.audio.context.destination);  
+  var o = game.audio.context.createOscillator();
+  o.frequency.value = 0;
+  o.detune.value = 0;
+  o.type = 'sawtooth';
+  o.connect(game.audio.volume);
+  o.frequency.value = 60;
+  game.audio.oscillator = o;
+  game.audio.oscillator.start(0);
+};
+//COLORS
+game.colors = [
+  //sky //terrain //mountains
+  ['#228', '#040', 1], //day
+  ['#93c', '#440', 0.5], //afternoon 
+  ['#546', '#111', 0.2], //night
+  ['#888', '#aaa', 0.2], //fog
+  ['#545', '#111', 0.2], //night
+  ['#529', '#230', 0.3], //morning
+  ['#aaf', '#eee', 0.2], //snow
 ];
-
-// Elementos del DOM
-const carElement = document.getElementById("car");
-const positionXElement = document.getElementById("positionX");
-const positionYElement = document.getElementById("positionY");
-const velocityElement = document.getElementById("velocity");
-const accelerationElement = document.getElementById("acceleration");
-const levelElement = document.getElementById("level");
-const objectiveElement = document.getElementById("objective");
-
-// Estado de las teclas
-const keys = {
-    ArrowUp: false,
-    ArrowDown: false,
-    ArrowLeft: false,
-    ArrowRight: false,
+var sky = document.getElementById('sky');
+var terrain = document.getElementById('terrain');
+game.changeTime = function () {
+  if (!frame.stop) {
+    game.time++;
+    if (game.time >= game.colors.length) game.time = 0;
+    sky.style.background = game.colors[game.time][0];
+    terrain.style.background = game.colors[game.time][1];
+    mountains.style.opacity = game.colors[game.time][2];
+    if (game.time == 3 || game.time == 4) fog.toggle();
+    if (game.time == 2 || game.time == 4) {
+      cars.classList.add('night');
+    } else {
+      cars.classList.remove('night');
+    }
+    game.timeCount = setTimeout(game.changeTime, 30000);
+  }
+};
+//FOG
+var fog = document.getElementById('fog');
+fog.init = function () {
+  fog.value = 0.02;
+  fog.status = false;  
+};
+fog.toggle = function () {
+  fog.classList.toggle('hidden');  
+  fog.status = !fog.status;
+  fog.value = fog.status ? 0.1 : 0.02;  
 };
 
-// Eventos de teclado
-document.addEventListener("keydown", (event) => {
-    if (keys.hasOwnProperty(event.key)) {
-        keys[event.key] = true;
-    }
-});
+//INIT
+game.init();
 
-document.addEventListener("keyup", (event) => {
-    if (keys.hasOwnProperty(event.key)) {
-        keys[event.key] = false;
-    }
-});
 
-// Función para calcular la velocidad usando diferencias finitas
-function calculateVelocity(currentPosition, lastPosition, deltaTime) {
-    return (currentPosition - lastPosition) / deltaTime;
-}
-
-// Función para calcular la aceleración usando diferencias finitas
-function calculateAcceleration(currentVelocity, lastVelocity, deltaTime) {
-    return (currentVelocity - lastVelocity) / deltaTime;
-}
-
-// Función para verificar si el auto ha llegado al punto de llegada
-function checkIfReachedEnd() {
-    const distanceToEnd = Math.sqrt((positionX - endPoint.x) ** 2 + (positionY - endPoint.y) ** 2);
-    if (distanceToEnd <= endRadius) {
-        alert("¡Has llegado a la meta! Nivel completado.");
-        resetLevel();
-    }
-}
-
-// Función para verificar el objetivo del nivel
-function checkLevelObjective() {
-    const currentVelocity = Math.sqrt(velocityX ** 2 + velocityY ** 2);
-    const currentAcceleration = Math.sqrt(accelerationX ** 2 + accelerationY ** 2);
-    const objective = levelObjectives[currentLevel - 1];
-
-    if (objective.velocityMin !== undefined) {
-        // Verificar si el jugador ha alcanzado el rango objetivo de velocidad
-        if (currentVelocity >= objective.velocityMin && currentVelocity <= objective.velocityMax) {
-            hasReachedObjective = true; // El jugador ha alcanzado el rango objetivo
-            outOfRangeTime = 0; // Reiniciar el contador de tiempo fuera del rango
-        }
-
-        // Verificar si el jugador ha salido del rango objetivo después de haberlo alcanzado
-        if (hasReachedObjective && (currentVelocity < objective.velocityMin || currentVelocity > objective.velocityMax)) {
-            outOfRangeTime += deltaTime; // Aumentar el tiempo fuera del rango
-            if (outOfRangeTime >= outOfRangeThreshold) {
-                alert("¡Fuera de rango! Pierdes el nivel.");
-                resetLevel();
-            }
-        }
-    } else if (objective.accelerationMin !== undefined) {
-        // Verificar si el jugador ha alcanzado el rango objetivo de aceleración
-        if (currentAcceleration >= objective.accelerationMin && currentAcceleration <= objective.accelerationMax) {
-            hasReachedObjective = true; // El jugador ha alcanzado el rango objetivo
-            outOfRangeTime = 0; // Reiniciar el contador de tiempo fuera del rango
-        }
-
-        // Verificar si el jugador ha salido del rango objetivo después de haberlo alcanzado
-        if (hasReachedObjective && (currentAcceleration < objective.accelerationMin || currentAcceleration > objective.accelerationMax)) {
-            outOfRangeTime += deltaTime; // Aumentar el tiempo fuera del rango
-            if (outOfRangeTime >= outOfRangeThreshold) {
-                alert("¡Fuera de rango! Pierdes el nivel.");
-                resetLevel();
-            }
-        }
-    }
-}
-
-// Función para mostrar feedback visual
-function showFeedback() {
-    const currentVelocity = Math.sqrt(velocityX ** 2 + velocityY ** 2);
-    const currentAcceleration = Math.sqrt(accelerationX ** 2 + accelerationY ** 2);
-    const objective = levelObjectives[currentLevel - 1];
-
-    if (objective.velocityMin !== undefined) {
-        if (currentVelocity >= objective.velocityMin && currentVelocity <= objective.velocityMax) {
-            velocityElement.style.color = "green";
-        } else {
-            velocityElement.style.color = "red";
-        }
-    } else if (objective.accelerationMin !== undefined) {
-        if (currentAcceleration >= objective.accelerationMin && currentAcceleration <= objective.accelerationMax) {
-            accelerationElement.style.color = "green";
-        } else {
-            accelerationElement.style.color = "red";
-        }
-    }
-}
-
-// Función para reiniciar el nivel
-function resetLevel() {
-    positionX = startPoint.x;
-    positionY = startPoint.y;
-    velocityX = 0;
-    velocityY = 0;
-    accelerationX = 0;
-    accelerationY = 0;
-    hasReachedObjective = false; // Reiniciar el estado de alcanzar el objetivo
-    outOfRangeTime = 0; // Reiniciar el contador de tiempo fuera del rango
-}
-
-// Función para actualizar el estado del juego
-function update() {
-    const currentTime = Date.now();
-    const deltaTime = (currentTime - lastTime) / 1000; // Tiempo en segundos
-    lastTime = currentTime;
-
-    // Calcular aceleración en X y Y
-    if (keys.ArrowUp) accelerationY = -accelerationRate;
-    else if (keys.ArrowDown) accelerationY = accelerationRate;
-    else accelerationY = 0;
-
-    if (keys.ArrowLeft) accelerationX = -accelerationRate;
-    else if (keys.ArrowRight) accelerationX = accelerationRate;
-    else accelerationX = 0;
-
-    // Aplicar frenado si no se presionan teclas
-    if (!keys.ArrowUp && !keys.ArrowDown) {
-        accelerationY = -Math.sign(velocityY) * brakingRate;
-    }
-    if (!keys.ArrowLeft && !keys.ArrowRight) {
-        accelerationX = -Math.sign(velocityX) * brakingRate;
-    }
-
-    // Actualizar velocidad
-    velocityX += accelerationX * deltaTime;
-    velocityY += accelerationY * deltaTime;
-
-    // Limitar la velocidad máxima
-    velocityX = Math.max(-maxSpeed, Math.min(velocityX, maxSpeed));
-    velocityY = Math.max(-maxSpeed, Math.min(velocityY, maxSpeed));
-
-    // Aplicar fricción cuando no se presionan teclas
-    if (!keys.ArrowUp && !keys.ArrowDown) velocityY *= friction;
-    if (!keys.ArrowLeft && !keys.ArrowRight) velocityX *= friction;
-
-    // Actualizar posición
-    positionX += velocityX * deltaTime;
-    positionY += velocityY * deltaTime;
-
-    // Limitar el auto al área del mapa
-    positionX = Math.max(0, Math.min(positionX, 800 - 40)); // Ancho del mapa - ancho del auto
-    positionY = Math.max(0, Math.min(positionY, 600 - 40)); // Alto del mapa - alto del auto
-
-    // Calcular velocidad usando diferencias finitas
-    const currentVelocityX = calculateVelocity(positionX, lastPositionX, deltaTime);
-    const currentVelocityY = calculateVelocity(positionY, lastPositionY, deltaTime);
-
-    // Calcular aceleración usando diferencias finitas
-    accelerationX = calculateAcceleration(currentVelocityX, lastVelocityX, deltaTime);
-    accelerationY = calculateAcceleration(currentVelocityY, lastVelocityY, deltaTime);
-
-    // Guardar valores actuales para el siguiente cálculo
-    lastPositionX = positionX;
-    lastPositionY = positionY;
-    lastVelocityX = currentVelocityX;
-    lastVelocityY = currentVelocityY;
-
-    // Mover el auto
-    carElement.style.left = `${positionX}px`;
-    carElement.style.top = `${positionY}px`;
-
-    // Mostrar valores en la interfaz
-    positionXElement.innerText = positionX.toFixed(2);
-    positionYElement.innerText = positionY.toFixed(2);
-    velocityElement.innerText = Math.sqrt(currentVelocityX ** 2 + currentVelocityY ** 2).toFixed(2);
-    accelerationElement.innerText = Math.sqrt(accelerationX ** 2 + accelerationY ** 2).toFixed(2);
-
-    // Verificar objetivos del nivel
-    checkLevelObjective();
-
-    // Verificar si el auto ha llegado al punto de llegada
-    checkIfReachedEnd();
-
-    // Mostrar feedback visual
-    showFeedback();
-
-    // Continuar el bucle de actualización
-    requestAnimationFrame(update);
-}
-
-// Iniciar el juego
-update();

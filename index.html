@@ -7,34 +7,40 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="game-container">
-        <h1>DerivaRacer Lite</h1>
-        <div class="level-info">
-            <p>Nivel: <span id="level">1</span></p>
-            <p>Objetivo: <span id="objective">Mantén la velocidad entre 100 y 200 px/s</span></p>
+    <div id="game">
+        <div id="sky"></div>
+        <div id="mountains">
+          <div class="mountain"></div>
+          <div class="mountain"></div>
+          <div class="mountain"></div>
+          <div class="mountain"></div>
         </div>
-        <div class="map">
-            <div id="car" class="car"></div>
+        <div id="terrain"></div>
+        <div id="fog" class="hidden"></div>
+        <canvas id="road"></canvas>
+        <div id="cars"></div>
+        <div id="car" class="player car"></div>
+        <div id="ui">
+          <div id="panel">
+            <div id="km"><a></a><a>0</a><a>0</a><a>0</a><a>0</a><a>0</a></div>
+            <div id="lap"><a>1</a></div>
+            <div id="position"><a>P</a><a>2</a><a>0</a><a>0</a></div>
+          </div>
         </div>
-        <div class="indicators">
-            <div class="indicator">
-                <span>Posición X</span>
-                <span id="positionX">0</span> px
-            </div>
-            <div class="indicator">
-                <span>Posición Y</span>
-                <span id="positionY">0</span> px
-            </div>
-            <div class="indicator">
-                <span>Velocidad</span>
-                <span id="velocity">0</span> px/s
-            </div>
-            <div class="indicator">
-                <span>Aceleración</span>
-                <span id="acceleration">0</span> px/s²
-            </div>
-        </div>
-    </div>
-    <script src="script.js"></script>
+      </div>
+      <p>
+        <button id="left">◀️</button>
+        <button id="up">⏏️</button>
+        <button id="right">▶️</button>
+      </p>
+      <p><button id="click">Click to start!</button></p>
+      <p>Left/Right Arrows or A/D to steer and<br> 
+        Up Arrow, W or Space to accelerate
+      </p>
+      <div id="velocity-panel">
+        <div id="velocity">Velocidad: 0 m/s</div>
+        <div id="acceleration">Aceleración: 0 m/s²</div>
+      </div>
+      <script src="script.js" defer></script>
 </body>
 </html>
