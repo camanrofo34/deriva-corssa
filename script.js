@@ -27,8 +27,8 @@ function updateVelocityAndAcceleration() {
         const acceleration = (velocity - lastVelocity) / accumulatedTime; // a = Δv / Δt
 
         // Actualizar valores en pantalla
-        document.getElementById('velocity').innerText = `Velocidad: ${velocity.toFixed(2)} m/s`;
-        document.getElementById('acceleration').innerText = `Aceleración: ${acceleration.toFixed(2)} m/s²`;
+        document.getElementById('velocity').innerText = `Velocity: ${velocity.toFixed(2)} m/s`;
+        document.getElementById('acceleration').innerText = `Acceleration: ${acceleration.toFixed(2)} m/s²`;
 
         // Actualizar variables para el próximo cálculo
         lastVelocity = velocity;
